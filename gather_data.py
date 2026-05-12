@@ -1,23 +1,18 @@
 import time
-import sys
 import pandas as pd
 from DIPPID import SensorUDP
 
 DURATION = 10  # seconds per recording
 
-PORT = 5700
-try:
-    sensor = SensorUDP(PORT)
-except Exception as e:
-    print(f"Error connecting to sensor: {e}")
-    sys.exit(1)
-
-name = input("Enter name: ")
-
 ACTIVITIES = ["running", "rowing", "lifting", "jumpingjacks"]
 SAMPLING_RATES = [20, 100]
 PLACEMENTS = ["hand", "pocket"]
 combos = [(a, r, p) for a in ACTIVITIES for r in SAMPLING_RATES for p in PLACEMENTS]
+
+PORT = 5700
+sensor = SensorUDP(PORT)
+
+name = input("Enter name: ")
 
 for activity, sampling_rate, placement in combos:
     print(f"Get ready for  {activity} at {sampling_rate}Hz with sensor on {placement} for {DURATION} seconds.")
@@ -31,6 +26,7 @@ for activity, sampling_rate, placement in combos:
 
     df = pd.DataFrame(columns=["id", "timestamp", "acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"])
     
+    time.sleep(2)  # small delay before starting to record
     print("Recording...")
     id = 0
     start_time = time.time()
