@@ -1,3 +1,4 @@
+import os
 import time
 import pandas as pd
 from DIPPID import SensorUDP
@@ -6,14 +7,15 @@ DURATION = 10  # seconds per recording
 ACTIVITIES = ["running", "rowing", "lifting", "jumpingjacks"]
 SAMPLING_RATES = [20, 100]
 PLACEMENTS = ["hand", "pocket"]
-combos = [(a, r, p, n) for n in range(1, 6) for a in ACTIVITIES for r in SAMPLING_RATES for p in PLACEMENTS]  # 5 recordings per combo
+combos = [(a, p, r, n) for p in PLACEMENTS for a in ACTIVITIES for r in SAMPLING_RATES for n in range(1, 6)]
 
 PORT = 5700
 sensor = SensorUDP(PORT)
 
 name = input("Enter name: ")
+os.makedirs("data", exist_ok=True)
 
-for activity, sampling_rate, placement, recording_num in combos:
+for activity, placement, sampling_rate, recording_num in combos:
     print(f"Get ready for {activity} at {sampling_rate}Hz with sensor on {placement} for {DURATION} seconds, recording #{recording_num}...")
     print("Press button 1 to start recording...")
 
@@ -42,6 +44,6 @@ for activity, sampling_rate, placement, recording_num in combos:
         time.sleep(max(0, start_time + id * interval - time.time()))  # maintain consistent sampling rate
     
     df = pd.DataFrame(rows)
-    filename = f"{name}_{activity}_{sampling_rate}Hz_{placement}_{recording_num}.csv"
+    filename = os.path.join("data", f"{name}_{activity}_{sampling_rate}Hz_{placement}_{recording_num}.csv")
     df.to_csv(filename, index=False)
     print(f"Saved {filename}\n")
