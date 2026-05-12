@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import pandas as pd
 from DIPPID import SensorUDP
@@ -23,10 +24,10 @@ for activity, placement, sampling_rate, recording_num in combos:
         if sensor.has_capability("button_1"):
             if int(sensor.get_value("button_1")) == 1:
                 break
-        time.sleep(0.02)  # check every 20ms
+        time.sleep(0.005)  # check every 5ms
 
     time.sleep(2)  # small delay to get ready after button press
-    print("Recording...")
+    print("Starting in 2 seconds...")
     rows = []
     id = 0
     start_time = time.time()
@@ -44,6 +45,9 @@ for activity, placement, sampling_rate, recording_num in combos:
         time.sleep(max(0, start_time + id * interval - time.time()))  # maintain consistent sampling rate
     
     df = pd.DataFrame(rows)
-    filename = os.path.join("data", f"{name}_{activity}_{sampling_rate}Hz_{placement}_{recording_num}.csv")
+    filename = os.path.join("data", f"{name}-{activity}-{sampling_rate}Hz-{placement}-{recording_num}.csv")
     df.to_csv(filename, index=False)
     print(f"Saved {filename}\n")
+
+print("All recordings complete!")
+sys.exit(0)
