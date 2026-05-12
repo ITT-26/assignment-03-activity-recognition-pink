@@ -27,7 +27,6 @@ for activity, sampling_rate, placement, recording_num in combos:
     print("Recording...")
     rows = []
     id = 0
-
     start_time = time.time()
     interval = 1 / sampling_rate
     while time.time() - start_time < DURATION:
@@ -35,7 +34,7 @@ for activity, sampling_rate, placement, recording_num in combos:
         gyro_data = sensor.get_value("gyroscope")
         rows.append({
             "id": id,
-            "timestamp": time.time(),
+            "timestamp": int(time.time() * 1000),
             "acc_x": acc_data['x'], "acc_y": acc_data['y'], "acc_z": acc_data['z'],
             "gyro_x": gyro_data['x'], "gyro_y": gyro_data['y'], "gyro_z": gyro_data['z'],
         })
