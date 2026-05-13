@@ -10,6 +10,6 @@
 
 
 ## Data Gathering
-Make sure your DIPPID device is connected to the same network as the host.
+Make sure your DIPPID device is connected to the same network as the host device. The program will prompt you to press Button 1 before each session.
 
-To start data gathering, run `python gather_data.py`.
+To start the gathering data , run `python gather_data.py`.
