@@ -7,3 +7,9 @@
 2. Set it up a virtual enviroment running `python -m venv .venv`.
 3. Activate the virtual environment using `.venv\Scripts\activate` on Windows and `source .venv/bin/activate` on Linux/Mac.
 4. Install the required dependencies via `pip install -r requirements.txt`.
+
+
+## Data Gathering
+Make sure your DIPPID device is connected to the same network as the host.
+
+To start data gathering, run `python gather_data.py`.
