@@ -8,8 +8,20 @@
 3. Activate the virtual environment using `.venv\Scripts\activate` on Windows and `source .venv/bin/activate` on Linux/Mac.
 4. Install the required dependencies via `pip install -r requirements.txt`.
 
-
-## Data Gathering
+### Data Gathering
 Make sure your DIPPID device is connected to the same network as the host device. The program will prompt you to press Button 1 before each session.
 
 To start the gathering data , run `python gather_data.py`.
+
+### Fitness Trainer App
+To start the app, run `python fitness_trainer.py`.
+
+
+# Documentation of the ML Process
+Recordings from the [shared repo](https://github.com/ITT-26/assignment-03-data-collection) were used for training and evaluating a SVM.
+
+## File name cleanup
+- unified activity names: `jumping_jacks` to `jumpingjacks` (ferdi, lennart, patrick, vanessa)
+- converted index to start at 1 (ferdi, vanessa)
+- replaced full name with one lowercase word (daniel, georg, thu)
+- lowercased all filename segments (vanessa) 
