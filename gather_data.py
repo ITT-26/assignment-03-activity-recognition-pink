@@ -18,7 +18,7 @@ os.makedirs("data", exist_ok=True)
 try:
     for activity, placement, sampling_rate, recording_num in combos:
         print(f"Get ready for {activity} at {sampling_rate}Hz with sensor on {placement} for {DURATION} seconds, recording #{recording_num}.")
-        print("Press button 1 on your DIPPID device to start recording.")
+        print("Press button 1 on your DIPPID device to start recording. You will have 2 seconds after pressing to get into position.")
 
         while True:
             if sensor.has_capability("button_1"):
