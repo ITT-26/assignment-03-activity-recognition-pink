@@ -7,6 +7,8 @@ WINDOW_W, WINDOW_H = 400, 600
 # ITEM_W, ITEM_H = 320, 60
 # BG_COLOR = (20 / 255, 20 / 255, 40 / 255, 1.0)  # dark blue
 
+# Use Enums for Placement and Activity giving nicer code
+
 class Placement(Enum):
     UNDEFINED = 1
     HAND = 2
@@ -19,7 +21,12 @@ class Activity(Enum):
     RUNNING = 3
 
 class CustomButton(pyglet.shapes.Rectangle):
-    def __init__(self, x, y, width, height, text, color=(0, 0, 0), highlight_color=(115, 190, 181), font_name='Calibri', font_size=20):
+    """
+    Custom Button for pyglet apps. Basically just a rectangle that has text and is highlighted when hovered.
+    A real observer pattern has not been implemented yet (due to laziness on my part).
+    """
+    def __init__(self, x, y, width, height, text, color=(0, 0, 0), highlight_color=(115, 190, 181),
+                 font_name='Calibri', font_size=20):
         super().__init__(x, y, width, height, color)
         self.x = x
         self.y = y
@@ -31,7 +38,8 @@ class CustomButton(pyglet.shapes.Rectangle):
         text_x = x + width / 2
         text_y = y + height / 2
         self.text_content = text
-        self.text = pyglet.text.Label(text, font_name=font_name, font_size=font_size, x=text_x, y=text_y, anchor_x='center', anchor_y='center')
+        self.text = pyglet.text.Label(text, font_name=font_name, font_size=font_size, x=text_x, y=text_y,
+                                      anchor_x='center', anchor_y='center')
 
 
     def is_point_inside(self, x, y):
@@ -45,6 +53,10 @@ class CustomButton(pyglet.shapes.Rectangle):
             self.color = self.origin_color
 
     def update_values(self):
+        """
+        Call this after changing size of the button so the text label is adjusted as well
+        :return:
+        """
         text_x = self.x + self.width / 2
         text_y = self.y + self.height / 2
         self.text.text = self.text_content
@@ -59,11 +71,16 @@ class CustomButton(pyglet.shapes.Rectangle):
 
 class TrainerApp:
     def __init__(self):
+        # Values for buttons
         self.window_dimensions = {'width': 800, 'height': 600}
         self.sprite_dimensions = {'width': 360, 'height': 460}
         self.sprite_coordinates = {'x_one': 20, 'y_one': 20, 'x_two': 420, 'y_two': 20}
         self.button_coordinates = {'x_one': 20, 'y_one': 50, 'x_two': 420, 'y_two': 50}
+        self.button_coordinates_small = {'x_one': 20, 'y_one': 520, 'x_two': 420, 'y_two': 520}
         self.button_dimensions = {'width': 360, 'height': 500}
+        self.button_dimensions_small = {'width': 360, 'height': 60}
+        self.button_color = (0, 0, 0)
+        self.button_highlight_color = (115, 190, 181)
         self.background_color = (20 / 255, 20 / 255, 40 / 255, 1.0)
         self.placement_button_hand = None
         self.placement_button_pocket = None
@@ -72,7 +89,8 @@ class TrainerApp:
 
         notif_x = self.window_dimensions['width'] / 2
         notif_y = 20
-        self.placement_notif = pyglet.text.Label('', x=notif_x, y=notif_y, anchor_x='center', anchor_y='center', font_name='Calibri', font_size=16)
+        self.placement_notif = pyglet.text.Label('', x=notif_x, y=notif_y, anchor_x='center', anchor_y='center',
+                                                 font_name='Calibri', font_size=16)
 
         self.sprites = {}
 
@@ -104,6 +122,8 @@ class TrainerApp:
         """
         Create sprites for each activity category by loading all images from assets. Store sprites in a dict for easy
         key access later.
+
+        Idea taken from chatGPT, no code copied directly
         """
         for activity_cat in Activity:
             sprite = pyglet.sprite.Sprite(
@@ -111,7 +131,6 @@ class TrainerApp:
                 x=self.sprite_coordinates['x_one'],
                 y=self.sprite_coordinates['y_one']
             )
-
 
             sprite_two = pyglet.sprite.Sprite(
                 pyglet.image.load(f'img/{activity_cat.name.lower()}_2.png'),
@@ -126,7 +145,7 @@ class TrainerApp:
 
     def _fit_sprite(self, sprite, target_width, target_height):
         """
-        Scales a sprite to fit the target dimensions.
+        Scales a sprite to fit the target dimensions. Code copied from chatGPT
         :param sprite: the sprite to fit
         :param target_width: desired width
         :param target_height: desired height
@@ -145,19 +164,23 @@ class TrainerApp:
             self.button_coordinates['y_one'],
             self.button_dimensions['width'],
             self.button_dimensions['height'],
-            'Sensor will be held in hand'
+            'Sensor will be held in hand',
+            color=self.button_color,
+            highlight_color=self.button_highlight_color
         )
         self.placement_button_pocket = CustomButton(
             self.button_coordinates['x_two'],
             self.button_coordinates['y_two'],
             self.button_dimensions['width'],
             self.button_dimensions['height'],
-            'Sensor will be in pocket'
+            'Sensor will be in pocket',
+            color=self.button_color,
+            highlight_color=self.button_highlight_color
         )
 
     def handle_click(self, x, y, button, modifiers):
         print(f'Registered Mouse button press at {x}, {y}')
-        # Change sensor placement value depending on what button is pressed
+        # Change sensor placement value depending on what button is pressed and display a notification
         if self.placement_button_hand.is_hovered:
             self.sensor_placement = Placement.HAND
             self.display_notif('Sensor placement was set to \'hand\'')
@@ -165,36 +188,45 @@ class TrainerApp:
             self.sensor_placement = Placement.POCKET
             self.display_notif('Sensor placement was set to \'pocket\'')
 
-        # If a button was pressed, rearrange the buttons
+        # Once the placement has been set initially, rearrange the buttons
         if self.sensor_placement is not Placement.UNDEFINED:
-            self.rearrange_placement_buttons()
+            self._rearrange_placement_buttons()
 
-    def display_notif(self, msg):
+    def display_notif(self, msg, reset=3):
         self.placement_notif.text = msg
-        pyglet.clock.schedule_once(self.reset_notif, 3)
+        pyglet.clock.schedule_once(self.reset_notif, reset)
 
     def reset_notif(self, dt):
-        print('Resetting notif')
+        """
+        Resets the placement notification.
+        :param dt: time after which the notification resets
+        :return:
+        """
         self.placement_notif.text = ''
 
-    def rearrange_placement_buttons(self):
-        self.placement_button_hand.x = 20
-        self.placement_button_hand.y = 520
-        self.placement_button_hand.width = 360
-        self.placement_button_hand.height = 80
+    def _rearrange_placement_buttons(self):
+        """
+        Changes the placement of the buttons so they are smaller and cover only the top of the screen
+        :return:
+        """
+        self.placement_button_hand.x = self.button_coordinates_small['x_one']
+        self.placement_button_hand.y = self.button_coordinates_small['y_one']
+        self.placement_button_hand.width = self.button_dimensions_small['width']
+        self.placement_button_hand.height = self.button_dimensions_small['height']
         self.placement_button_hand.text_content = 'Click here for hand mode'
 
-        self.placement_button_pocket.x = 420
-        self.placement_button_pocket.y = 520
-        self.placement_button_pocket.width = 360
-        self.placement_button_pocket.height = 80
+        self.placement_button_pocket.x = self.button_coordinates_small['x_two']
+        self.placement_button_pocket.y = self.button_coordinates_small['y_two']
+        self.placement_button_pocket.width = self.button_dimensions_small['width']
+        self.placement_button_pocket.height = self.button_dimensions_small['height']
         self.placement_button_pocket.text_content = 'Click here for pocket mode'
 
         self.placement_button_hand.update_values()
         self.placement_button_pocket.update_values()
 
     def handle_mouse_move(self, x, y, dx, dy) -> str:
-        #print(f'Registered Mouse move to {x}, {y}')
+        # Return a string to set the cursor since app has no direct access to window
+        # Check if mouse hovers over one of the buttons and if yes, highlight it
         if self.placement_button_hand.is_point_inside(x, y):
             self.placement_button_hand.set_hovered(True)
             return 'pointer'
@@ -214,7 +246,6 @@ class TrainerApp:
         return
 
     def draw(self):
-
         self.placement_button_hand.draw()
         self.placement_button_pocket.draw()
         # Check which sprites need to be drawn
@@ -224,16 +255,15 @@ class TrainerApp:
                 sprite.draw()
         self.placement_notif.draw()
 
-    def _draw_sensor_placement_selection(self):
-        self.placement_button_hand.draw()
-        self.placement_button_pocket.draw()
 
 def main():
+    # Magic numbers since size should be a property of TrainerApp but initing app before win crashes
     win = pyglet.window.Window(800, 600, caption="Fitness Trainer", resizable=False)
     app = TrainerApp()
     pyglet.gl.glClearColor(*app.background_color)
     recognizer = activity.ActivityRecognizer()
 
+    # set the cursors the app should use
     app.define_cursors(win.get_system_mouse_cursor(win.CURSOR_DEFAULT), win.get_system_mouse_cursor(win.CURSOR_HAND))
 
     @win.event
