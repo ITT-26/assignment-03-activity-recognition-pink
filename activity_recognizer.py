@@ -6,12 +6,14 @@ from sklearn import svm
 from sklearn.preprocessing import StandardScaler
 from DIPPID import SensorUDP
 
+IS_M5_STACK = False
+
 PORT = 5700
 SAMPLING_RATE = 20
 SAMPLE_INTERVAL = 1.0 / SAMPLING_RATE
 WIN = 51   # 2.56s at 20Hz
 STEP = 25  # 50% overlap
-TRIM = 25
+TRIM = 0
 COLS = ['acc_x', 'acc_y', 'acc_z', 'gyro_x', 'gyro_y', 'gyro_z']
 
 
@@ -20,9 +22,11 @@ def _extract_features(w):
     fft_mag = np.abs(np.fft.rfft(w, axis=1))
     dominant_freq = freqs[fft_mag[:, 1:].argmax(axis=1) + 1]
     return np.array([
-        *w.mean(1), *w.std(1), *np.ptp(w, axis=1),
-        *[(np.diff(np.sign(r)) != 0).sum() / len(r) for r in w],
-        *np.sqrt((w[3:]**2).mean(1)),
+        *w.mean(1),
+        *w.std(1),
+        *np.ptp(w, axis=1),  # Peak-to-peak (max - min)
+        *[(np.diff(np.sign(r)) != 0).sum() / len(r) for r in w],  # Zero-crossing rate
+        *np.sqrt((w[3:]**2).mean(1)),  # Root mean square (RMS) energy
         *dominant_freq
     ])
 
@@ -81,8 +85,14 @@ class ActivityRecognizer:
             return
         acc  = self.sensor.get_value('accelerometer')
         gyro = self.sensor.get_value('gyroscope')
-        self.buffer.append([acc['x'], acc['y'], acc['z'],
-                            gyro['x'], gyro['y'], gyro['z']])
+        gyro_scale = np.pi / 180 if IS_M5_STACK else 1.0  # Convert degrees/s to radians/s for M5Stack data
+        self.buffer.append([
+            acc['x'], acc['y'], acc['z'],
+            gyro['x'] * gyro_scale,
+            gyro['y'] * gyro_scale,
+            gyro['z'] * gyro_scale,
+        ])
+
         self.samples_since_predict += 1
         if len(self.buffer) == WIN and self.samples_since_predict >= STEP:
             w = np.array(self.buffer).T

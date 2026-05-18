@@ -13,6 +13,7 @@ LIGHT_GRAY = (229, 229, 234)
 MID_GRAY = (174, 174, 178)
 TEXT_DARK = (28, 28, 30)
 TEXT_GRAY = (142, 142, 147)
+TEXT_FADED = (190, 190, 194)
 
 APPLE_RED = (255, 59, 48)
 APPLE_ORANGE = (255, 149, 0)
@@ -29,7 +30,7 @@ ACTIVITY_LABELS = {
     "rowing": "Rowing",
     "running": "Running",
 }
-ACTIVITY_DURATION = 30.0
+ACTIVITY_DURATION = 20.0
 PREP_DURATION = 5.0
 
 FONT = "Arial"
@@ -40,26 +41,15 @@ def _rgba(rgb, a=255):
 
 
 class FitnessTrainerApp:
-    """
-    Apple Fitness-inspired portrait UI (400x700).
-
-    Ring is drawn as four stacked shapes:
-      1. faint glow Circle  (radius r_out+12)  — visible only when correct
-      2. filled gray Circle  (radius r_out)     — full background ring
-      3. colored Sector      (radius r_out)     — progress pie slice
-      4. filled off-white Circle (radius r_in)  — punches the center hole
-    """
-
     def __init__(self, window):
         self.window = window
         self.batch = pyglet.graphics.Batch()
 
-        g0 = pyglet.graphics.Group(order=0)  # static background
         g1 = pyglet.graphics.Group(order=1)  # glow halo behind the ring
         g2 = pyglet.graphics.Group(order=2)  # ring: gray background circle
         g3 = pyglet.graphics.Group(order=3)  # ring: progress sector
-        g4 = pyglet.graphics.Group(order=4)  # ring: center hole + mid elements
-        g5 = pyglet.graphics.Group(order=5)  # progress bar fill
+        g4 = pyglet.graphics.Group(order=4)  # ring hole + chip + row highlights
+        g5 = pyglet.graphics.Group(order=5)  # marker circles
         g6 = pyglet.graphics.Group(order=6)  # all text
 
         self.activities = list(ACTIVITIES)
@@ -71,15 +61,8 @@ class FitnessTrainerApp:
         self.pulse_t = 0.0
         self.session_done = False
 
-        n = len(self.activities)
-
-        ring_cx, ring_cy = WINDOW_W // 2, 480
+        ring_cx, ring_cy = WINDOW_W // 2, 520
         r_out, r_in = 131, 109
-
-        # --- background ---
-        self._bg = pyglet.shapes.Rectangle(
-            0, 0, WINDOW_W, WINDOW_H,
-            color=OFF_WHITE, batch=self.batch, group=g0)
 
         # --- ring ---
         self._glow = pyglet.shapes.Circle(
@@ -102,7 +85,7 @@ class FitnessTrainerApp:
 
         # --- text inside ring ---
         self.timer_lbl = pyglet.text.Label(
-            "0:30",
+            "0:20",
             font_name=FONT, font_size=46,
             x=ring_cx, y=ring_cy + 18,
             anchor_x="center", anchor_y="center",
@@ -117,65 +100,112 @@ class FitnessTrainerApp:
             color=_rgba(RING_COLOR),
             batch=self.batch, group=g6)
 
-        # --- detection chip ---
-        chip_w, chip_h = 220, 40
-        chip_y = 300
+        # --- detected caption + chip ---
+        self._detected_caption = pyglet.text.Label(
+            "DETECTED",
+            font_name=FONT, font_size=10,
+            x=WINDOW_W // 2, y=345,
+            anchor_x="center", anchor_y="center",
+            color=_rgba(TEXT_GRAY),
+            batch=self.batch, group=g6)
+
+        chip_w, chip_h = 260, 50
+        chip_y = 310
         self.chip_bg = pyglet.shapes.RoundedRectangle(
-            ring_cx - chip_w // 2, chip_y - chip_h // 2, chip_w, chip_h, radius=20,
+            (WINDOW_W - chip_w) // 2, chip_y - chip_h // 2, chip_w, chip_h, radius=18,
             color=MID_GRAY, batch=self.batch, group=g4)
         self.chip_lbl = pyglet.text.Label(
             "Waiting for sensor...",
-            font_name=FONT, font_size=11,
-            x=ring_cx, y=chip_y,
+            font_name=FONT, font_size=16,
+            x=WINDOW_W // 2, y=chip_y,
             anchor_x="center", anchor_y="center",
             color=(255, 255, 255, 255),
             batch=self.batch, group=g6)
 
-        # --- exercise list ---
-        list_spacing = 36
-        self.list_lbls = [
-            pyglet.text.Label(
-                ACTIVITY_LABELS[act],
-                font_name=FONT, font_size=16,
-                x=WINDOW_W // 2, y=230 - i * list_spacing,
-                anchor_x="center", anchor_y="center",
-                color=_rgba(TEXT_GRAY),
-                batch=self.batch, group=g6)
-            for i, act in enumerate(self.activities)
-        ]
+        # --- workout list ---
+        list_left = 40
+        list_width = WINDOW_W - 2 * list_left
+        marker_x = list_left + 22
+        text_x = list_left + 48
+        list_y_top = 200
+        list_spacing = 46
+        row_h = 38
 
-        # --- session progress bar ---
-        bar_x = (WINDOW_W - 340) // 2
-        self._bar_bg = pyglet.shapes.RoundedRectangle(
-            bar_x, 42, 340, 8, radius=4,
-            color=LIGHT_GRAY, batch=self.batch, group=g4)
-        self.prog_fill = pyglet.shapes.RoundedRectangle(
-            bar_x, 42, 2, 8, radius=4,
-            color=APPLE_BLUE, batch=self.batch, group=g5)
-        self.prog_lbl = pyglet.text.Label(
-            f"1 / {n}",
+        self._workout_heading = pyglet.text.Label(
+            "WORKOUT",
             font_name=FONT, font_size=10,
-            x=WINDOW_W // 2, y=30,
-            anchor_x="center", anchor_y="center",
+            x=list_left, y=list_y_top + 32,
+            anchor_x="left", anchor_y="center",
             color=_rgba(TEXT_GRAY),
             batch=self.batch, group=g6)
+        self._workout_heading.bold = True
+
+        self.row_highlights = []
+        self.marker_outers = []
+        self.marker_inners = []
+        self.list_lbls = []
+
+        for i, act in enumerate(self.activities):
+            y = list_y_top - i * list_spacing
+
+            hl = pyglet.shapes.RoundedRectangle(
+                list_left, y - row_h // 2, list_width, row_h, radius=10,
+                color=LIGHT_GRAY, batch=self.batch, group=g4)
+            hl.opacity = 0
+            self.row_highlights.append(hl)
+
+            outer = pyglet.shapes.Circle(
+                marker_x, y, 9,
+                color=LIGHT_GRAY, batch=self.batch, group=g5)
+            inner = pyglet.shapes.Circle(
+                marker_x, y, 6,
+                color=OFF_WHITE, batch=self.batch, group=g5)
+            self.marker_outers.append(outer)
+            self.marker_inners.append(inner)
+
+            lbl = pyglet.text.Label(
+                ACTIVITY_LABELS[act],
+                font_name=FONT, font_size=16,
+                x=text_x, y=y,
+                anchor_x="left", anchor_y="center",
+                color=_rgba(TEXT_GRAY),
+                batch=self.batch, group=g6)
+            self.list_lbls.append(lbl)
 
         self._refresh()
 
     # ------------------------------------------------------------------
 
+    def _set_row_done(self, i):
+        self.list_lbls[i].color = _rgba(APPLE_GREEN)
+        self.list_lbls[i].bold = False
+        self.marker_outers[i].color = APPLE_GREEN
+        self.marker_inners[i].color = APPLE_GREEN
+        self.row_highlights[i].opacity = 0
+
+    def _set_row_current(self, i):
+        self.list_lbls[i].color = _rgba(TEXT_DARK)
+        self.list_lbls[i].bold = True
+        self.marker_outers[i].color = RING_COLOR
+        self.marker_inners[i].color = RING_COLOR
+        self.row_highlights[i].opacity = 255
+
+    def _set_row_pending(self, i):
+        self.list_lbls[i].color = _rgba(TEXT_GRAY)
+        self.list_lbls[i].bold = False
+        self.marker_outers[i].color = LIGHT_GRAY
+        self.marker_inners[i].color = OFF_WHITE
+        self.row_highlights[i].opacity = 0
+
     def _update_list(self, idx):
-        for i, lbl in enumerate(self.list_lbls):
-            lbl.text = ACTIVITY_LABELS[self.activities[i]]
+        for i in range(len(self.list_lbls)):
+            self.list_lbls[i].text = ACTIVITY_LABELS[self.activities[i]]
             if i < idx:
-                lbl.color = _rgba(APPLE_GREEN)
-                lbl.bold = False
+                self._set_row_done(i)
             elif i == idx:
-                lbl.color = _rgba(TEXT_DARK)
-                lbl.bold = True
+                self._set_row_current(i)
             else:
-                lbl.color = _rgba(TEXT_GRAY)
-                lbl.bold = False
+                self._set_row_pending(i)
 
     def _refresh(self):
         if self.session_done:
@@ -188,7 +218,6 @@ class FitnessTrainerApp:
         idx = self.current_idx
         act = self.activities[idx]
         prog = min(1.0, self.elapsed / ACTIVITY_DURATION)
-        n = len(self.activities)
 
         self.ring_sector.color = RING_COLOR
         self.ring_sector.angle = prog * 360
@@ -201,7 +230,8 @@ class FitnessTrainerApp:
             self._glow.opacity = 0
 
         rem = max(0.0, ACTIVITY_DURATION - self.elapsed)
-        self.timer_lbl.text = f"{int(rem // 60)}:{int(rem % 60):02d}"
+        secs = int(math.ceil(rem))
+        self.timer_lbl.text = f"{secs // 60}:{secs % 60:02d}"
         self.act_lbl.text = ACTIVITY_LABELS[act]
         self.act_lbl.color = _rgba(RING_COLOR)
 
@@ -215,13 +245,8 @@ class FitnessTrainerApp:
 
         self._update_list(idx)
 
-        session_prog = (idx + prog) / n
-        self.prog_fill.width = max(2, int(340 * session_prog))
-        self.prog_lbl.text = f"{idx + 1} / {n}"
-
     def _refresh_prep(self):
         idx = self.current_idx
-        n = len(self.activities)
         prep_prog = (PREP_DURATION - self.prep_remaining) / PREP_DURATION
 
         self.ring_sector.color = PREP_COLOR
@@ -235,13 +260,12 @@ class FitnessTrainerApp:
         self.act_lbl.color = _rgba(PREP_COLOR)
 
         self.chip_bg.color = MID_GRAY
-        self.chip_lbl.text = "Get ready"
+        if self.detected:
+            self.chip_lbl.text = f"Get ready for {ACTIVITY_LABELS[self.activities[idx]]}"
+        else:
+            self.chip_lbl.text = "Waiting for sensor..."
 
         self._update_list(idx)
-
-        session_prog = idx / n
-        self.prog_fill.width = max(2, int(340 * session_prog))
-        self.prog_lbl.text = f"{idx + 1} / {n}"
 
     def _show_complete(self):
         self.timer_lbl.text = "Done!"
@@ -249,17 +273,25 @@ class FitnessTrainerApp:
         self.act_lbl.color = _rgba(APPLE_GREEN)
         self.chip_bg.color = APPLE_GREEN
         self.chip_lbl.text = "Session complete"
-        self.prog_fill.width = 340
         self.ring_sector.color = APPLE_GREEN
         self.ring_sector.start_angle = 90
         self.ring_sector.angle = 360
         self._glow.opacity = 0
-        for i, lbl in enumerate(self.list_lbls):
-            lbl.text = ACTIVITY_LABELS[self.activities[i]]
-            lbl.color = _rgba(APPLE_GREEN)
-            lbl.bold = False
+        for i in range(len(self.list_lbls)):
+            self.list_lbls[i].text = ACTIVITY_LABELS[self.activities[i]]
+            self._set_row_done(i)
 
     # ------------------------------------------------------------------
+
+    def restart(self):
+        self.current_idx = 0
+        self.elapsed = 0.0
+        self.prep_remaining = PREP_DURATION
+        self.detected = None
+        self.is_correct = False
+        self.pulse_t = 0.0
+        self.session_done = False
+        self._refresh()
 
     def update(self, dt, detected):
         if self.session_done:
@@ -314,6 +346,8 @@ def main():
         if symbol == pyglet.window.key.Q:
             pyglet.app.exit()
             os._exit(0)
+        elif symbol == pyglet.window.key.R:
+            app.restart()
 
     @win.event
     def on_draw():
